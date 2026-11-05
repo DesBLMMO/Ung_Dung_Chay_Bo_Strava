@@ -9,8 +9,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -182,7 +185,13 @@ fun TrackingScreen(
     }
 
     if (showSettingsDialog) {
-        TrackingSettingsDialog(onDismiss = { showSettingsDialog = false })
+        TrackingSettingsDialog(
+            isAutoPauseEnabled = state.isAutoPauseEnabled,
+            isAudioCuesEnabled = state.isAudioCuesEnabled,
+            onToggleAutoPause = { viewModel.toggleAutoPause() },
+            onToggleAudioCues = { viewModel.toggleAudioCues() },
+            onDismiss = { showSettingsDialog = false }
+        )
     }
 
     LaunchedEffect(showTrendMessage) {
@@ -255,17 +264,67 @@ fun TrackingScreen(
             }
         }
 
+        AnimatedVisibility(
+            visible = state.isAutoPaused,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 96.dp)
+        ) {
+            Surface(
+                color = Color(0xFFFEF3C7),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.5.dp, Color(0xFFF59E0B)),
+                shadowElevation = 8.dp,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PauseCircleFilled,
+                        contentDescription = null,
+                        tint = Color(0xFFD97706),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "⏸ Tự động tạm dừng (đang đứng yên)",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF92400E),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 16.dp)
-                .offset(y = (-45).dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .offset(y = (-30).dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             MapLayerButton(onClick = { viewModel.cycleLayerStyle() })
 
             Map3DButton(is3D = is3D, onClick = { viewModel.toggle3D() })
+
+            StravaIconButton(
+                icon = if (state.isAudioCuesEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                contentDescription = "Giọng nói hướng dẫn",
+                tint = if (state.isAudioCuesEnabled) SportOrange else Color(0xFF9CA3AF),
+                onClick = { viewModel.toggleAudioCues() }
+            )
+
+            StravaIconButton(
+                icon = if (state.isAutoPauseEnabled) Icons.Default.PauseCircleFilled else Icons.Default.PauseCircleOutline,
+                contentDescription = "Tự động tạm dừng",
+                tint = if (state.isAutoPauseEnabled) SportOrange else Color(0xFF9CA3AF),
+                onClick = { viewModel.toggleAutoPause() }
+            )
 
             StravaIconButton(
                 icon = Icons.Default.MyLocation,
@@ -330,7 +389,8 @@ private fun StravaIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tint: Color = Color(0xFF1F2937)
 ) {
     Box(
         modifier = modifier
@@ -352,7 +412,7 @@ private fun StravaIconButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = Color(0xFF1F2937),
+            tint = tint,
             modifier = Modifier.size(24.dp)
         )
     }
@@ -732,7 +792,7 @@ private fun FloatingMetricsCard(
                         fontSize = 25.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827)
+                        color = if (state.isAutoPaused || state.isPaused) PauseYellow else Color(0xFF111827)
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
@@ -774,7 +834,7 @@ private fun FloatingMetricsCard(
                         fontSize = 25.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827)
+                        color = if (state.isAutoPaused || state.isPaused) PauseYellow else Color(0xFF111827)
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
@@ -1375,10 +1435,13 @@ private fun RouteSelectionSheetContent(
 }
 
 @Composable
-private fun TrackingSettingsDialog(onDismiss: () -> Unit) {
-    var autoPause by remember { mutableStateOf(true) }
-    var audioCues by remember { mutableStateOf(true) }
-
+private fun TrackingSettingsDialog(
+    isAutoPauseEnabled: Boolean,
+    isAudioCuesEnabled: Boolean,
+    onToggleAutoPause: () -> Unit,
+    onToggleAudioCues: () -> Unit,
+    onDismiss: () -> Unit
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = PureWhite,
@@ -1399,12 +1462,12 @@ private fun TrackingSettingsDialog(onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Tự động tạm dừng", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF111827))
-                        Text("Tạm dừng khi bạn dừng đèn đỏ hoặc nghỉ", fontSize = 11.5.sp, color = Color(0xFF6B7280))
+                        Text("Tự động tạm dừng (Auto-Pause)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF111827))
+                        Text("Tạm dừng khi bạn dừng đèn đỏ hoặc nghỉ (< 2.2 km/h)", fontSize = 11.5.sp, color = Color(0xFF6B7280))
                     }
                     Switch(
-                        checked = autoPause,
-                        onCheckedChange = { autoPause = it },
+                        checked = isAutoPauseEnabled,
+                        onCheckedChange = { onToggleAutoPause() },
                         colors = SwitchDefaults.colors(checkedThumbColor = PureWhite, checkedTrackColor = SportOrange)
                     )
                 }
@@ -1416,11 +1479,11 @@ private fun TrackingSettingsDialog(onDismiss: () -> Unit) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Thông báo giọng nói mỗi km", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF111827))
-                        Text("Đọc tốc độ pace và khoảng cách", fontSize = 11.5.sp, color = Color(0xFF6B7280))
+                        Text("Đọc tốc độ pace, thời gian chặng và khoảng cách", fontSize = 11.5.sp, color = Color(0xFF6B7280))
                     }
                     Switch(
-                        checked = audioCues,
-                        onCheckedChange = { audioCues = it },
+                        checked = isAudioCuesEnabled,
+                        onCheckedChange = { onToggleAudioCues() },
                         colors = SwitchDefaults.colors(checkedThumbColor = PureWhite, checkedTrackColor = SportOrange)
                     )
                 }

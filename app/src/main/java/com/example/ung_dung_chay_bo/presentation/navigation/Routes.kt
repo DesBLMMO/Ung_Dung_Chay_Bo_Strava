@@ -9,6 +9,11 @@ sealed class Routes(val route: String) {
 
     data object Tracking : Routes("tracking")
     data object SaveActivity : Routes("save_activity")
+    data object History : Routes("history")
+
+    data object ActivityDetail : Routes("activity_detail/{activityId}") {
+        fun createRoute(activityId: Long): String = "activity_detail/$activityId"
+    }
 
     data object CreatePost : Routes("create_post")
 }

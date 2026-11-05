@@ -55,6 +55,8 @@ import com.example.ung_dung_chay_bo.domain.model.UserProfile
 @Composable
 fun ProfileScreen(
     onLogoutSuccess: () -> Unit,
+    onActivityClick: (activityId: Long) -> Unit = {},
+    onViewAllHistoryClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -376,13 +378,28 @@ fun ProfileScreen(
                 ProfileSubTab.ACTIVITIES -> {
                     item {
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "Lịch sử hoạt động gần đây",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF111827),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Lịch sử hoạt động gần đây",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF111827)
+                            )
+                            TextButton(onClick = onViewAllHistoryClick) {
+                                Text(
+                                    text = "Xem tất cả",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = SportOrange
+                                )
+                            }
+                        }
                     }
 
                     if (uiState.recentActivities.isEmpty()) {
@@ -428,6 +445,7 @@ fun ProfileScreen(
                         items(uiState.recentActivities) { activity ->
                             ActivityHistoryCard(
                                 activity = activity,
+                                onClick = { onActivityClick(activity.recordId) },
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                             )
                         }
@@ -884,12 +902,14 @@ private fun WeeklyGoalCard(
 @Composable
 private fun ActivityHistoryCard(
     activity: UserActivityItem,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(3.dp, RoundedCornerShape(16.dp)),
+            .shadow(3.dp, RoundedCornerShape(16.dp))
+            .clickable { onClick() },
         color = PureWhite,
         shape = RoundedCornerShape(16.dp)
     ) {

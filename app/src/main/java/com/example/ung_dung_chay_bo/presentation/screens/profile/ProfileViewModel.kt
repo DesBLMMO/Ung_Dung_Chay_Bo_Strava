@@ -32,6 +32,7 @@ enum class ProfileSubTab(val title: String) {
 
 data class UserActivityItem(
     val id: String,
+    val recordId: Long = 0L,
     val title: String,
     val sportType: SportType,
     val distanceKm: Double,
@@ -107,6 +108,7 @@ class ProfileViewModel @Inject constructor(
                     val sport = runCatching { SportType.valueOf(entity.sportType) }.getOrDefault(SportType.RUN)
                     UserActivityItem(
                         id = entity.sessionId,
+                        recordId = entity.id,
                         title = entity.title,
                         sportType = sport,
                         distanceKm = entity.distanceKm,

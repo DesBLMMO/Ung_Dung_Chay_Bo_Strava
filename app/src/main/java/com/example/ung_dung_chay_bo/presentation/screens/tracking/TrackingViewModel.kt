@@ -86,6 +86,14 @@ class TrackingViewModel @Inject constructor(
         sendServiceAction(TrackingService.ACTION_STOP)
     }
 
+    fun toggleAutoPause() {
+        sendServiceAction(TrackingService.ACTION_TOGGLE_AUTO_PAUSE)
+    }
+
+    fun toggleAudioCues() {
+        sendServiceAction(TrackingService.ACTION_TOGGLE_AUDIO_CUES)
+    }
+
     fun clearSessionData() {
         val state = trackingState.value
         if (state.sessionId.isNotBlank()) {

@@ -7,10 +7,12 @@ import com.example.ung_dung_chay_bo.domain.usecase.auth.GetCurrentUserUseCase
 import com.example.ung_dung_chay_bo.domain.usecase.auth.LoginWithEmailUseCase
 import com.example.ung_dung_chay_bo.domain.usecase.auth.RegisterWithEmailUseCase
 import com.example.ung_dung_chay_bo.domain.usecase.auth.SignInWithGoogleUseCase
+import com.example.ung_dung_chay_bo.domain.usecase.user.CheckOnboardingCompletedUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,7 +22,8 @@ class AuthViewModel @Inject constructor(
     private val loginWithEmailUseCase: LoginWithEmailUseCase,
     private val registerWithEmailUseCase: RegisterWithEmailUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
-    private val getCurrentUserUseCase: GetCurrentUserUseCase
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val checkOnboardingCompletedUseCase: CheckOnboardingCompletedUseCase
 ) : ViewModel() {
 
     private val _loginUiState = MutableStateFlow(LoginUiState())
@@ -30,6 +33,10 @@ class AuthViewModel @Inject constructor(
     val registerUiState: StateFlow<RegisterUiState> = _registerUiState.asStateFlow()
 
     val isUserLoggedIn: Boolean get() = getCurrentUserUseCase.isLoggedIn()
+
+    suspend fun checkIsOnboardingCompleted(): Boolean {
+        return runCatching { checkOnboardingCompletedUseCase().first() }.getOrDefault(false)
+    }
 
     fun onLoginEmailChange(email: String) {
         _loginUiState.update { it.copy(email = email, errorMessage = null) }

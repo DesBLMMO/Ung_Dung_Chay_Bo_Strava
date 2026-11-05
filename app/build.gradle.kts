@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +9,14 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
 }
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
+val maptilerApiKey: String = localProperties.getProperty("MAPTILER_API_KEY") ?: "ZbjMPaEz0nGzX8JnWXNA"
 
 android {
     namespace = "com.example.ung_dung_chay_bo"
@@ -19,6 +30,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "MAPTILER_API_KEY", "\"$maptilerApiKey\"")
     }
 
     buildTypes {
@@ -39,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

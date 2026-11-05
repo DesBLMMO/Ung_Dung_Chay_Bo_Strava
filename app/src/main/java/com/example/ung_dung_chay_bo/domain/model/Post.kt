@@ -4,7 +4,9 @@ enum class SportType(val title: String) {
     RUN("Chạy bộ"),
     WALK("Đi bộ"),
     RIDE("Đạp xe"),
-    TRAIL_RUN("Chạy địa hình")
+    TRAIL_RUN("Chạy địa hình");
+
+    val displayName: String get() = title
 }
 
 enum class PostVisibility(val title: String) {

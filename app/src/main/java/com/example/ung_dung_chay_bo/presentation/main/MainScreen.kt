@@ -55,6 +55,8 @@ fun MainScreen(
     onStartTrackingClick: () -> Unit,
     onNavigateToCreatePost: () -> Unit,
     onLogoutSuccess: () -> Unit,
+    onActivityClick: (activityId: Long) -> Unit = {},
+    onNavigateToHistory: () -> Unit = {},
     homeViewModel: HomeViewModel
 ) {
     var selectedTab by remember { mutableStateOf(StravaTab.HOME) }
@@ -208,7 +210,11 @@ fun MainScreen(
                 )
                 StravaTab.RECORD -> onStartTrackingClick()
                 StravaTab.GROUPS -> CommunityScreen(onNavigateToCreatePost = onNavigateToCreatePost)
-                StravaTab.YOU -> ProfileScreen(onLogoutSuccess = onLogoutSuccess)
+                StravaTab.YOU -> ProfileScreen(
+                    onLogoutSuccess = onLogoutSuccess,
+                    onActivityClick = onActivityClick,
+                    onViewAllHistoryClick = onNavigateToHistory
+                )
             }
         }
     }

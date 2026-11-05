@@ -22,6 +22,12 @@ interface ActivityRepository {
 
     fun getAllActivities(): Flow<List<ActivityRecordEntity>>
 
+    suspend fun getActivityById(id: Long): ActivityRecordEntity?
+
+    suspend fun getActivityBySessionId(sessionId: String): ActivityRecordEntity?
+
+    suspend fun deleteActivity(id: Long): Resource<Unit>
+
     fun getUserActivityStats(): Flow<UserActivityStats>
 
     suspend fun syncActivitiesFromCloud(): Resource<Unit>

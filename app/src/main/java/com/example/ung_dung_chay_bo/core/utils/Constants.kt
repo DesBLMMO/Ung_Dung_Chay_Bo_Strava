@@ -1,5 +1,7 @@
 package com.example.ung_dung_chay_bo.core.utils
 
+import com.example.ung_dung_chay_bo.BuildConfig
+
 object Constants {
     const val USERS_COLLECTION = "users"
     const val ACTIVITIES_COLLECTION = "activities"
@@ -14,13 +16,17 @@ object Constants {
 
     const val MIN_ACTIVITY_DURATION_SECONDS = 60
 
-    const val MAPTILER_API_KEY = "ZbjMPaEz0nGzX8JnWXNA"
-    const val MAPTILER_STYLE_OUTDOOR = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=ZbjMPaEz0nGzX8JnWXNA"
-    const val MAPTILER_STYLE_STREETS = "https://api.maptiler.com/maps/streets-v2/style.json?key=ZbjMPaEz0nGzX8JnWXNA"
-    const val MAPTILER_STYLE_SATELLITE = "https://api.maptiler.com/maps/satellite/style.json?key=ZbjMPaEz0nGzX8JnWXNA"
+    val MAPTILER_API_KEY: String get() = runCatching { BuildConfig.MAPTILER_API_KEY }.getOrDefault("ZbjMPaEz0nGzX8JnWXNA")
+    val MAPTILER_STYLE_OUTDOOR: String get() = "https://api.maptiler.com/maps/outdoor-v2/style.json?key=$MAPTILER_API_KEY"
+    val MAPTILER_STYLE_STREETS: String get() = "https://api.maptiler.com/maps/streets-v2/style.json?key=$MAPTILER_API_KEY"
+    val MAPTILER_STYLE_SATELLITE: String get() = "https://api.maptiler.com/maps/satellite/style.json?key=$MAPTILER_API_KEY"
     const val DEFAULT_MAP_ZOOM = 16f
     const val POLYLINE_WIDTH = 8f
 
     const val LONG_PRESS_DURATION_MS = 1500L
     const val KM_MILESTONE_VIBRATION_MS = 200L
+
+    const val AUTO_PAUSE_SPEED_THRESHOLD_MS = 0.6f
+    const val AUTO_RESUME_SPEED_THRESHOLD_MS = 0.85f
+    const val AUTO_PAUSE_TRIGGER_SECONDS = 3
 }

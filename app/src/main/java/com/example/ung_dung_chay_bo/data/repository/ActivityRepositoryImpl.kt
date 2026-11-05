@@ -118,6 +118,40 @@ class ActivityRepositoryImpl @Inject constructor(
         return activityRecordDao.getAllActivities()
     }
 
+    override suspend fun getActivityById(id: Long): ActivityRecordEntity? {
+        return activityRecordDao.getActivityById(id)
+    }
+
+    override suspend fun getActivityBySessionId(sessionId: String): ActivityRecordEntity? {
+        return activityRecordDao.getActivityBySessionId(sessionId)
+    }
+
+    override suspend fun deleteActivity(id: Long): Resource<Unit> {
+        return try {
+            val record = activityRecordDao.getActivityById(id)
+            if (record != null) {
+                val currentUid = firebaseAuth.currentUser?.uid
+                if (!currentUid.isNullOrEmpty()) {
+                    try {
+                        firestore.collection(Constants.USERS_COLLECTION)
+                            .document(currentUid)
+                            .collection("activities")
+                            .document(record.sessionId)
+                            .delete()
+                            .await()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Không thể xóa hoạt động trên Firestore: ${e.message}")
+                    }
+                }
+                activityRecordDao.deleteActivity(id)
+            }
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi xóa hoạt động: ${e.message}", e)
+            Resource.Error(e.message ?: "Lỗi xóa hoạt động")
+        }
+    }
+
     override fun getUserActivityStats(): Flow<UserActivityStats> {
         return activityRecordDao.getAllActivities().map { activities ->
             calculateStats(activities)

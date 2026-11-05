@@ -18,6 +18,9 @@ interface ActivityRecordDao {
     @Query("SELECT * FROM activities_record WHERE sessionId = :sessionId LIMIT 1")
     suspend fun getActivityBySessionId(sessionId: String): ActivityRecordEntity?
 
+    @Query("SELECT * FROM activities_record WHERE id = :id LIMIT 1")
+    suspend fun getActivityById(id: Long): ActivityRecordEntity?
+
     @Query("SELECT COUNT(*) FROM activities_record")
     fun getActivitiesCount(): Flow<Int>
 
