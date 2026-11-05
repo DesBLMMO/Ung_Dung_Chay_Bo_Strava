@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "253055049197",
+    "project_id": "strava-ung-dung-the-thao",
+    "storage_bucket": "strava-ung-dung-the-thao.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:253055049197:android:2c1e08a32e0f8f5ac09be4",
+        "android_client_info": {
+          "package_name": "com.example.ung_dung_chay_bo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCP8d44jcanKmoMpFgONtfNzaWZ9yvMprA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
