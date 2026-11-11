@@ -26,9 +26,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.ripple
@@ -90,6 +93,7 @@ fun TrackingScreen(
     val availableRoutes by viewModel.availableRoutes.collectAsStateWithLifecycle()
     val layerStyle by viewModel.layerStyle.collectAsStateWithLifecycle()
     val is3D by viewModel.is3D.collectAsStateWithLifecycle()
+    val initialLocation by viewModel.initialLocation.collectAsStateWithLifecycle()
 
     var showSportSheet by remember { mutableStateOf(false) }
     var showRouteSheet by remember { mutableStateOf(false) }
@@ -102,16 +106,44 @@ fun TrackingScreen(
     var hasLocationPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED
         )
     }
 
+    var isStartingTrackingRequested by remember { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        hasLocationPermission = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        hasLocationPermission = fineGranted || coarseGranted
         if (hasLocationPermission) {
-            viewModel.startTracking()
+            // Tự động truy cập lấy vị trí GPS ngay khi người dùng ấn Đồng ý
+            viewModel.fetchInitialLocation()
+
+            if (isStartingTrackingRequested) {
+                isStartingTrackingRequested = false
+                viewModel.startTracking()
+            }
+        }
+    }
+
+    // Tự động yêu cầu quyền vị trí ngay khi vào màn hình nếu chưa được cấp
+    LaunchedEffect(Unit) {
+        if (!hasLocationPermission) {
+            val perms = buildList {
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+                add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+            permissionLauncher.launch(perms.toTypedArray())
+        } else {
+            viewModel.fetchInitialLocation()
         }
     }
 
@@ -205,12 +237,14 @@ fun TrackingScreen(
         TrackingMapSection(
             state = state,
             selectedRoute = selectedRoute,
+            initialLocation = initialLocation,
             layerStyle = layerStyle,
             is3D = is3D,
             onMapReady = { mapLibreMapInstance = it },
             modifier = Modifier.fillMaxSize()
         )
 
+        // Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -220,7 +254,7 @@ fun TrackingScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             StravaIconButton(
-                icon = Icons.Default.KeyboardArrowDown,
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Quay lại",
                 onClick = {
                     if (state.isTracking || state.isPaused) {
@@ -234,7 +268,7 @@ fun TrackingScreen(
             TrendPillBadge(onClick = { showTrendMessage = true })
 
             StravaIconButton(
-                icon = Icons.Default.Settings,
+                icon = Icons.Default.Tune,
                 contentDescription = "Cài đặt",
                 onClick = { showSettingsDialog = true }
             )
@@ -300,38 +334,50 @@ fun TrackingScreen(
             }
         }
 
+        // Right floating map action controls
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 16.dp)
-                .offset(y = (-30).dp),
+                .padding(end = 14.dp)
+                .offset(y = (-10).dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            MapLayerButton(onClick = { viewModel.cycleLayerStyle() })
+            // Group 1: Map Layers & 3D Capsule
+            MapControlsCapsule(
+                is3D = is3D,
+                onCycleLayer = { viewModel.cycleLayerStyle() },
+                onToggle3D = { viewModel.toggle3D() }
+            )
 
-            Map3DButton(is3D = is3D, onClick = { viewModel.toggle3D() })
-
+            // Group 2: Audio cues button
             StravaIconButton(
-                icon = if (state.isAudioCuesEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                icon = if (state.isAudioCuesEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
                 contentDescription = "Giọng nói hướng dẫn",
-                tint = if (state.isAudioCuesEnabled) SportOrange else Color(0xFF9CA3AF),
+                isActive = state.isAudioCuesEnabled,
                 onClick = { viewModel.toggleAudioCues() }
             )
 
+            // Group 3: Auto-pause toggle button
             StravaIconButton(
                 icon = if (state.isAutoPauseEnabled) Icons.Default.PauseCircleFilled else Icons.Default.PauseCircleOutline,
                 contentDescription = "Tự động tạm dừng",
-                tint = if (state.isAutoPauseEnabled) SportOrange else Color(0xFF9CA3AF),
+                isActive = state.isAutoPauseEnabled,
                 onClick = { viewModel.toggleAutoPause() }
             )
 
+            // Group 4: My Location button
             StravaIconButton(
                 icon = Icons.Default.MyLocation,
                 contentDescription = "Vị trí của tôi",
+                size = 44.dp,
+                iconSize = 22.dp,
+                tint = Color(0xFF2563EB),
                 onClick = {
                     val map = mapLibreMapInstance ?: return@StravaIconButton
-                    val currentPos = state.currentLocation ?: Pair(21.0025, 105.8185)
+                    val currentPos = state.currentLocation
+                        ?: initialLocation
+                        ?: Pair(21.0025, 105.8185)
                     map.animateCamera(
                         CameraUpdateFactory.newLatLngZoom(
                             LatLng(currentPos.first, currentPos.second),
@@ -364,6 +410,7 @@ fun TrackingScreen(
                 onRouteChange = { showRouteSheet = true },
                 onStart = {
                     if (!hasLocationPermission) {
+                        isStartingTrackingRequested = true
                         val perms = buildList {
                             add(Manifest.permission.ACCESS_FINE_LOCATION)
                             add(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -390,19 +437,25 @@ private fun StravaIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Color(0xFF1F2937)
+    isActive: Boolean = false,
+    size: androidx.compose.ui.unit.Dp = 42.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 21.dp,
+    tint: Color = if (isActive) SportOrange else Color(0xFF334155),
+    backgroundColor: Color = if (isActive) Color(0xFFFFF2EB) else PureWhite,
+    borderColor: Color = if (isActive) Color(0xFFFFD4C0) else Color(0xFFE2E8F0)
 ) {
     Box(
         modifier = modifier
-            .size(46.dp)
+            .size(size)
             .shadow(
-                elevation = 6.dp,
+                elevation = 5.dp,
                 shape = CircleShape,
-                ambientColor = Color(0x33000000),
-                spotColor = Color(0x33000000)
+                ambientColor = Color(0x15000000),
+                spotColor = Color(0x20000000)
             )
             .clip(CircleShape)
-            .background(PureWhite)
+            .background(backgroundColor)
+            .border(0.8.dp, borderColor, CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = SportOrange.copy(alpha = 0.2f))
@@ -413,158 +466,148 @@ private fun StravaIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = tint,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(iconSize)
         )
     }
 }
 
 @Composable
 private fun TrendPillBadge(onClick: () -> Unit) {
-    Box(
+    Surface(
         modifier = Modifier
             .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(26.dp),
-                ambientColor = Color(0x22000000),
-                spotColor = Color(0x22000000)
+                elevation = 5.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = Color(0x15000000),
+                spotColor = Color(0x18000000)
             )
-            .clip(RoundedCornerShape(26.dp))
-            .background(PureWhite)
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        Color(0xFFFF9A62).copy(alpha = 0.6f),
-                        Color(0xFFFFE0D0).copy(alpha = 0.8f),
-                        Color(0xFFFFB899).copy(alpha = 0.6f)
-                    )
-                ),
-                RoundedCornerShape(26.dp)
-            )
+            .clip(RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = SportOrange.copy(alpha = 0.15f))
-            ) { onClick() }
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center
+            ) { onClick() },
+        color = PureWhite,
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, Color(0xFFFFD4C0))
     ) {
         Row(
+            modifier = Modifier.padding(start = 6.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Box(
                 modifier = Modifier
                     .size(26.dp)
                     .clip(CircleShape)
                     .background(
-                        Brush.sweepGradient(
-                            listOf(
-                                Color(0xFF22C55E),
-                                Color(0xFFEAB308),
-                                Color(0xFFFC4C02),
-                                Color(0xFF3B82F6),
-                                Color(0xFF22C55E)
-                            )
+                        Brush.linearGradient(
+                            listOf(Color(0xFFFF7A45), Color(0xFFFC4C02))
                         )
-                    )
-                    .padding(2.5.dp)
-                    .clip(CircleShape)
-                    .background(PureWhite),
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Lock,
+                    imageVector = Icons.Default.Whatshot,
                     contentDescription = null,
-                    tint = Color(0xFF374151),
-                    modifier = Modifier.size(13.dp)
+                    tint = PureWhite,
+                    modifier = Modifier.size(15.dp)
                 )
             }
 
-            Column {
-                Text(
-                    text = "Xem xu hướng",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF111827),
-                    lineHeight = 15.sp
-                )
-                Text(
-                    text = "Nhấn để thêm Bản đồ nhiệt hàng tuần",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xFF6B7280),
-                    lineHeight = 12.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MapLayerButton(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(46.dp)
-            .shadow(6.dp, CircleShape, ambientColor = Color(0x33000000), spotColor = Color(0x33000000))
-            .clip(CircleShape)
-            .background(PureWhite)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = SportOrange.copy(alpha = 0.2f))
-            ) { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Layers,
-            contentDescription = "Lớp bản đồ",
-            tint = Color(0xFF1F2937),
-            modifier = Modifier.size(24.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 1.dp, y = (-1).dp)
-                .size(16.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1F2937)),
-            contentAlignment = Alignment.Center
-        ) {
             Text(
-                text = "4",
-                color = PureWhite,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Black
+                text = "Bản đồ xu hướng",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(15.dp)
             )
         }
     }
 }
 
 @Composable
-private fun Map3DButton(is3D: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(46.dp)
-            .shadow(6.dp, CircleShape, ambientColor = Color(0x33000000), spotColor = Color(0x33000000))
-            .clip(CircleShape)
-            .background(if (is3D) Color(0xFFFFF0EA) else PureWhite)
-            .border(
-                if (is3D) 1.5.dp else 0.dp,
-                if (is3D) SportOrange else Color.Transparent,
-                CircleShape
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = SportOrange.copy(alpha = 0.2f))
-            ) { onClick() },
-        contentAlignment = Alignment.Center
+private fun MapControlsCapsule(
+    is3D: Boolean,
+    onCycleLayer: () -> Unit,
+    onToggle3D: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.shadow(
+            elevation = 6.dp,
+            shape = RoundedCornerShape(22.dp),
+            ambientColor = Color(0x18000000),
+            spotColor = Color(0x20000000)
+        ),
+        shape = RoundedCornerShape(22.dp),
+        color = PureWhite,
+        border = BorderStroke(0.8.dp, Color(0xFFE2E8F0))
     ) {
-        Text(
-            text = if (is3D) "2D" else "3D",
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 14.sp,
-            color = if (is3D) SportOrange else Color(0xFF1F2937)
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(44.dp)
+        ) {
+            // Nút chuyển đổi kiểu lớp bản đồ
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = SportOrange.copy(alpha = 0.2f))
+                    ) { onCycleLayer() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Layers,
+                    contentDescription = "Đổi kiểu bản đồ",
+                    tint = Color(0xFF1E293B),
+                    modifier = Modifier.size(21.dp)
+                )
+
+                // Dấu chấm cam tinh tế báo hiệu chế độ layer
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 8.dp)
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(SportOrange)
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 7.dp),
+                thickness = 0.8.dp,
+                color = Color(0xFFF1F5F9)
+            )
+
+            // Nút bật/tắt 3D/2D
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
+                    .background(if (is3D) Color(0xFFFFF2EB) else PureWhite)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = SportOrange.copy(alpha = 0.2f))
+                    ) { onToggle3D() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (is3D) "3D" else "2D",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.sp,
+                    color = if (is3D) SportOrange else Color(0xFF475569)
+                )
+            }
+        }
     }
 }
 
@@ -572,6 +615,7 @@ private fun Map3DButton(is3D: Boolean, onClick: () -> Unit) {
 private fun TrackingMapSection(
     state: TrackingState,
     selectedRoute: SuggestedRoute?,
+    initialLocation: Pair<Double, Double>?,
     layerStyle: MapTilerLayerStyle,
     is3D: Boolean,
     onMapReady: (MapLibreMap) -> Unit,
@@ -586,8 +630,12 @@ private fun TrackingMapSection(
     var suggestedRoutePolyline by remember { mutableStateOf<Polyline?>(null) }
     var userLocationMarker by remember { mutableStateOf<Marker?>(null) }
 
+    // Theo dõi xem đã di chuyển camera đến vị trí GPS thực chưa
+    var hasCenteredOnRealLocation by remember { mutableStateOf(false) }
+
     val defaultLatLng = LatLng(21.0025, 105.8185)
     val currentLatLng = state.currentLocation?.let { LatLng(it.first, it.second) }
+    val initialLatLng = initialLocation?.let { LatLng(it.first, it.second) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -623,6 +671,30 @@ private fun TrackingMapSection(
         )
     }
 
+    // Khi nhận được initialLocation từ GPS (trước khi nhấn Bắt đầu),
+    // tự động di chuyển camera đến vị trí thực của người dùng
+    LaunchedEffect(initialLatLng, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        if (initialLatLng != null && currentLatLng == null) {
+            // Cập nhật marker vị trí người dùng
+            userLocationMarker?.let { map.removeMarker(it) }
+            userLocationMarker = map.addMarker(
+                MarkerOptions()
+                    .position(initialLatLng)
+                    .title("Vị trí của bạn")
+                    .snippet("GPS đang hoạt động")
+            )
+
+            if (!hasCenteredOnRealLocation) {
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(initialLatLng, 16.0),
+                    800
+                )
+                hasCenteredOnRealLocation = true
+            }
+        }
+    }
+
     LaunchedEffect(currentLatLng, mapLibreMap) {
         val map = mapLibreMap ?: return@LaunchedEffect
         currentLatLng?.let { pos ->
@@ -634,7 +706,14 @@ private fun TrackingMapSection(
                     .snippet("GPS đang hoạt động")
             )
 
-            if (state.isTracking) {
+            // Di chuyển camera lần đầu khi nhận GPS từ TrackingService
+            if (!hasCenteredOnRealLocation) {
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(pos, 16.0),
+                    800
+                )
+                hasCenteredOnRealLocation = true
+            } else if (state.isTracking) {
                 map.animateCamera(CameraUpdateFactory.newLatLng(pos), 600)
             }
         }
@@ -689,8 +768,17 @@ private fun TrackingMapSection(
                     onMapReady(map)
 
                     map.setStyle(Style.Builder().fromUri(layerStyle.url)) {
+                        // Ưu tiên: currentLocation > initialLocation > default
+                        val bestTarget = currentLatLng
+                            ?: initialLatLng
+                            ?: defaultLatLng
+
+                        if (currentLatLng != null || initialLatLng != null) {
+                            hasCenteredOnRealLocation = true
+                        }
+
                         val initialPosition = CameraPosition.Builder()
-                            .target(currentLatLng ?: defaultLatLng)
+                            .target(bestTarget)
                             .zoom(16.0)
                             .tilt(if (is3D) 55.0 else 0.0)
                             .build()
@@ -721,41 +809,66 @@ private fun FloatingMetricsCard(
     }
 
     val speedLabel = when (sportType) {
-        SportType.RIDE -> "Tốc độ trung bình (km/h)"
+        SportType.RIDE -> "Tốc độ TB (km/h)"
         SportType.RUN -> "Pace / Tốc độ (km/h)"
         SportType.WALK -> "Tốc độ đi bộ (km/h)"
         SportType.TRAIL_RUN -> "Tốc độ địa hình (km/h)"
     }
 
+    val sportIcon = when (sportType) {
+        SportType.RIDE -> Icons.AutoMirrored.Filled.DirectionsBike
+        SportType.RUN -> Icons.AutoMirrored.Filled.DirectionsRun
+        SportType.WALK -> Icons.AutoMirrored.Filled.DirectionsWalk
+        SportType.TRAIL_RUN -> Icons.Default.Terrain
+    }
+
     Surface(
         modifier = modifier.shadow(
             elevation = 10.dp,
-            shape = RoundedCornerShape(22.dp),
-            ambientColor = Color(0x22000000),
+            shape = RoundedCornerShape(24.dp),
+            ambientColor = Color(0x18000000),
             spotColor = Color(0x22000000)
         ),
         color = PureWhite,
-        shape = RoundedCornerShape(22.dp)
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(0.8.dp, Color(0xFFF1F5F9))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+                .padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Header bar inside card: Sport badge + Expand icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Spacer(modifier = Modifier.size(28.dp))
-
-                Text(
-                    text = sportType.title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF111827)
-                )
+                Surface(
+                    color = Color(0xFFFFF7F2),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(0.8.dp, Color(0xFFFFD4C0))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = sportIcon,
+                            contentDescription = null,
+                            tint = SportOrange,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = sportType.title,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+                }
 
                 Box(
                     modifier = Modifier
@@ -770,39 +883,41 @@ private fun FloatingMetricsCard(
                     Icon(
                         imageVector = Icons.Default.OpenInFull,
                         contentDescription = "Mở rộng",
-                        tint = Color(0xFF4B5563),
-                        modifier = Modifier.size(17.dp)
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // 3 metrics: Duration, Speed/Pace, Distance
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
+                // Thời gian
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = GpsUtils.formatDuration(state.elapsedSeconds),
-                        fontSize = 25.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = if (state.isAutoPaused || state.isPaused) PauseYellow else Color(0xFF111827)
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (state.isAutoPaused || state.isPaused) PauseYellow else Color(0xFF0F172A)
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Thời gian",
                         fontSize = 11.sp,
-                        color = Color(0xFF6B7280),
-                        fontWeight = FontWeight.Medium
+                        color = Color(0xFF64748B),
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
+                // Tốc độ chính giữa (To, đậm, nổi bật)
                 Column(
                     modifier = Modifier.weight(1.3f),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -810,38 +925,37 @@ private fun FloatingMetricsCard(
                     Text(
                         text = if (speedKmH > 0.1f) "%.1f".format(speedKmH).replace(".", ",") else "0,0",
                         fontSize = 44.sp,
-                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Black,
-                        color = Color(0xFF111827),
-                        lineHeight = 46.sp
+                        color = Color(0xFF0F172A),
+                        lineHeight = 44.sp
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = speedLabel,
                         fontSize = 11.sp,
-                        color = Color(0xFF6B7280),
-                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B),
+                        fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
                     )
                 }
 
+                // Quãng đường
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = "%.2f".format(state.distanceKm).replace(".", ","),
-                        fontSize = 25.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = if (state.isAutoPaused || state.isPaused) PauseYellow else Color(0xFF111827)
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (state.isAutoPaused || state.isPaused) PauseYellow else Color(0xFF0F172A)
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Quãng đường (km)",
                         fontSize = 11.sp,
-                        color = Color(0xFF6B7280),
-                        fontWeight = FontWeight.Medium
+                        color = Color(0xFF64748B),
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -902,14 +1016,18 @@ private fun BottomControlPanel(
                         modifier = Modifier
                             .size(64.dp)
                             .shadow(
-                                elevation = 4.dp,
+                                elevation = 5.dp,
                                 shape = CircleShape,
-                                ambientColor = Color(0x18000000),
-                                spotColor = Color(0x18000000)
+                                ambientColor = Color(0x15000000),
+                                spotColor = Color(0x20000000)
                             )
                             .clip(CircleShape)
-                            .background(Color(0xFFFFF0EB))
-                            .border(1.dp, Color(0xFFFFDCD0), CircleShape),
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFFFFF7F2), Color(0xFFFFECE2))
+                                )
+                            )
+                            .border(1.2.dp, Color(0xFFFFD5C0), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         val sportIcon = when (selectedSport) {
@@ -922,38 +1040,30 @@ private fun BottomControlPanel(
                             imageVector = sportIcon,
                             contentDescription = selectedSport.title,
                             tint = SportOrange,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp)
                         )
-
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-3).dp, y = 3.dp)
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(PureWhite)
-                                .padding(1.5.dp)
-                                .clip(CircleShape)
-                                .background(SportOrange),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                tint = PureWhite,
-                                modifier = Modifier.size(10.dp)
-                            )
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(7.dp))
 
-                    Text(
-                        text = selectedSport.title,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF1F2937)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = selectedSport.title,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
 
                 when {
@@ -965,44 +1075,54 @@ private fun BottomControlPanel(
                                 indication = null
                             ) { onStart() }
                         ) {
+                            // Vòng ngoài phát quang + Nút hero chính
                             Box(
                                 modifier = Modifier
-                                    .size(76.dp)
-                                    .shadow(
-                                        elevation = 12.dp,
-                                        shape = CircleShape,
-                                        ambientColor = SportOrange,
-                                        spotColor = SportOrange.copy(alpha = 0.6f)
-                                    )
+                                    .size(82.dp)
                                     .clip(CircleShape)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0xFFFF6224),
-                                                Color(0xFFFC4C02),
-                                                Color(0xFFD93B00)
-                                            )
-                                        )
-                                    )
-                                    .border(2.dp, Color(0x33FC4C02), CircleShape),
+                                    .background(SportOrange.copy(alpha = 0.15f))
+                                    .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.PlayArrow,
-                                    contentDescription = "Bắt đầu",
-                                    tint = PureWhite,
+                                Box(
                                     modifier = Modifier
-                                        .size(42.dp)
-                                        .offset(x = 2.5.dp)
-                                )
+                                        .fillMaxSize()
+                                        .shadow(
+                                            elevation = 12.dp,
+                                            shape = CircleShape,
+                                            ambientColor = SportOrange,
+                                            spotColor = SportOrange.copy(alpha = 0.6f)
+                                        )
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(
+                                                    Color(0xFFFF6F33),
+                                                    Color(0xFFFC4C02),
+                                                    Color(0xFFD63600)
+                                                )
+                                            )
+                                        )
+                                        .border(1.5.dp, Color(0x44FFFFFF), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = "Bắt đầu",
+                                        tint = PureWhite,
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .offset(x = 2.5.dp)
+                                    )
+                                }
                             }
 
-                            Spacer(modifier = Modifier.height(7.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
                                 text = "Bắt đầu",
                                 fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = SportOrange
                             )
                         }
@@ -1107,16 +1227,16 @@ private fun BottomControlPanel(
                         modifier = Modifier
                             .size(64.dp)
                             .shadow(
-                                elevation = 4.dp,
+                                elevation = 5.dp,
                                 shape = CircleShape,
-                                ambientColor = Color(0x18000000),
-                                spotColor = Color(0x18000000)
+                                ambientColor = Color(0x15000000),
+                                spotColor = Color(0x20000000)
                             )
                             .clip(CircleShape)
-                            .background(if (hasSelectedRoute) Color(0xFFEEF4FF) else Color(0xFFF3F4F6))
+                            .background(if (hasSelectedRoute) Color(0xFFEFF6FF) else PureWhite)
                             .border(
-                                1.dp,
-                                if (hasSelectedRoute) Color(0xFF3B82F6) else Color(0xFFE5E7EB),
+                                1.2.dp,
+                                if (hasSelectedRoute) Color(0xFF3B82F6) else Color(0xFFE2E8F0),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
@@ -1124,18 +1244,18 @@ private fun BottomControlPanel(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.AltRoute,
                             contentDescription = "Lộ trình",
-                            tint = if (hasSelectedRoute) Color(0xFF2563EB) else Color(0xFF374151),
-                            modifier = Modifier.size(28.dp)
+                            tint = if (hasSelectedRoute) Color(0xFF2563EB) else Color(0xFF334155),
+                            modifier = Modifier.size(30.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(7.dp))
 
                     Text(
-                        text = if (hasSelectedRoute) "Đã gắn lộ trình" else "Thêm Lộ trình",
+                        text = if (hasSelectedRoute) "Đã có lộ trình" else "Thêm Lộ trình",
                         fontSize = 12.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasSelectedRoute) Color(0xFF2563EB) else Color(0xFF1F2937)
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasSelectedRoute) Color(0xFF2563EB) else Color(0xFF1E293B)
                     )
                 }
             }
@@ -1189,13 +1309,13 @@ private fun LongPressFinishButton(onFinish: () -> Unit) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(62.dp)
-                .shadow(6.dp, CircleShape, ambientColor = ErrorRed.copy(alpha = 0.3f), spotColor = ErrorRed.copy(alpha = 0.3f))
+                .size(64.dp)
+                .shadow(6.dp, CircleShape, ambientColor = ErrorRed.copy(alpha = 0.25f), spotColor = ErrorRed.copy(alpha = 0.35f))
                 .clip(CircleShape)
-                .background(Color(0xFFFFEBEE))
+                .background(Color(0xFFFEF2F2))
                 .border(
                     1.5.dp,
-                    if (isPressed) ErrorRed else ErrorRed.copy(alpha = 0.5f),
+                    if (isPressed) ErrorRed else Color(0xFFFECACA),
                     CircleShape
                 )
                 .pointerInput(Unit) {
@@ -1209,13 +1329,18 @@ private fun LongPressFinishButton(onFinish: () -> Unit) {
                 }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("■", fontSize = 17.sp, color = ErrorRed)
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = "Kết thúc",
+                    tint = ErrorRed,
+                    modifier = Modifier.size(24.dp)
+                )
                 Text(
                     text = if (isPressed) "..." else "GIỮ",
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = ErrorRed,
-                    letterSpacing = 1.sp
+                    letterSpacing = 0.8.sp
                 )
             }
         }
@@ -1403,7 +1528,11 @@ private fun RouteSelectionSheetContent(
                             )
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "${route.areaName} • ${route.distanceKm} km • ${route.durationFormatted}",
+                                text = if (route.runnersCount > 0) {
+                                    "${route.areaName} • ${route.distanceKm} km • ${route.runnersCountFormatted}"
+                                } else {
+                                    "${route.areaName} • ${route.distanceKm} km • ${route.durationFormatted}"
+                                },
                                 fontSize = 12.sp,
                                 color = Color(0xFF6B7280)
                             )

@@ -1,10 +1,13 @@
 package com.example.ung_dung_chay_bo.presentation.screens.home
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.ung_dung_chay_bo.core.health.HealthConnectManager
 import com.example.ung_dung_chay_bo.domain.model.AppNotification
 import com.example.ung_dung_chay_bo.domain.model.ChatMessage
 import com.example.ung_dung_chay_bo.domain.model.FriendPost
+import com.example.ung_dung_chay_bo.domain.model.HealthConnectStatus
 import com.example.ung_dung_chay_bo.domain.model.SuggestedUser
 import com.example.ung_dung_chay_bo.domain.repository.ChatRepository
 import com.example.ung_dung_chay_bo.domain.repository.UserRepository
@@ -29,7 +32,8 @@ class HomeViewModel @Inject constructor(
     private val observeFeedUseCase: ObserveFeedUseCase,
     private val publishPostUseCase: PublishPostUseCase,
     private val toggleKudosUseCase: ToggleKudosUseCase,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val healthConnectManager: HealthConnectManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -48,6 +52,7 @@ class HomeViewModel @Inject constructor(
         observeNotifications()
         observeChatConversations()
         observeCommunityChecklist()
+        checkHealthConnectStatus()
     }
 
     private fun loadUserProfile() {
@@ -168,6 +173,59 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             userRepository.toggleFollow(currentUid, userId, targetName)
+        }
+    }
+
+    val healthConnectPermissions: Set<String>
+        get() = healthConnectManager.permissions
+
+    fun getHealthConnectInstallIntent(): Intent = healthConnectManager.getInstallIntent()
+
+    fun checkHealthConnectStatus() {
+        viewModelScope.launch {
+            val status = healthConnectManager.getAvailabilityStatus()
+            val hasPermissions = if (status == HealthConnectStatus.AVAILABLE) {
+                healthConnectManager.hasAllPermissions()
+            } else false
+
+            _uiState.update {
+                it.copy(
+                    healthConnectStatus = status,
+                    isHealthConnectLinked = hasPermissions
+                )
+            }
+
+            if (hasPermissions) {
+                syncHealthConnectData()
+            }
+        }
+    }
+
+    fun syncHealthConnectData() {
+        viewModelScope.launch {
+            try {
+                val summary = healthConnectManager.readTodaySummary()
+                _uiState.update { it.copy(healthSummary = summary) }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun onHealthConnectPermissionsResult(granted: Set<String>) {
+        viewModelScope.launch {
+            val isLinked = granted.isNotEmpty()
+            _uiState.update { it.copy(isHealthConnectLinked = isLinked) }
+            if (isLinked) {
+                userRepository.updateChecklistDevice(true, "Google Health Connect")
+                syncHealthConnectData()
+            }
+        }
+    }
+
+    fun disconnectHealthConnect() {
+        viewModelScope.launch {
+            userRepository.updateChecklistDevice(false, null)
+            _uiState.update { it.copy(isHealthConnectLinked = false, healthSummary = null) }
         }
     }
 

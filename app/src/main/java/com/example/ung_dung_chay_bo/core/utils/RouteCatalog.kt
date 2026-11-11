@@ -29,6 +29,7 @@ object RouteCatalog {
                 isSaved = true,
                 startPoint = Pair(21.0880, 105.8180),
                 routesInAreaCount = 7,
+                runnersCount = 2350,
                 imageUrl = "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=400",
                 routePoints = listOf(
                     21.0880 to 105.8180,
@@ -56,6 +57,7 @@ object RouteCatalog {
                 isSaved = false,
                 startPoint = Pair(21.0050, 105.7850),
                 routesInAreaCount = 12,
+                runnersCount = 1180,
                 imageUrl = "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
                 routePoints = listOf(
                     21.0050 to 105.7850,
@@ -81,6 +83,7 @@ object RouteCatalog {
                 isSaved = false,
                 startPoint = Pair(21.0055, 105.8760),
                 routesInAreaCount = 6,
+                runnersCount = 1620,
                 imageUrl = "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400",
                 routePoints = listOf(
                     21.0055 to 105.8760,
@@ -108,6 +111,7 @@ object RouteCatalog {
                 isSaved = true,
                 startPoint = Pair(21.0315, 105.8525),
                 routesInAreaCount = 14,
+                runnersCount = 4720,
                 imageUrl = "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=400",
                 routePoints = listOf(
                     21.0315 to 105.8525,
@@ -134,6 +138,7 @@ object RouteCatalog {
                 isSaved = false,
                 startPoint = Pair(21.0475, 105.8365),
                 routesInAreaCount = 8,
+                runnersCount = 3850,
                 imageUrl = "https://images.unsplash.com/photo-1530549387789-4c1017266635?w=400",
                 routePoints = listOf(
                     21.0475 to 105.8365,
@@ -162,6 +167,7 @@ object RouteCatalog {
                 isSaved = false,
                 startPoint = Pair(21.0360, 105.8540),
                 routesInAreaCount = 4,
+                runnersCount = 3120,
                 imageUrl = "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400",
                 routePoints = listOf(
                     21.0360 to 105.8540,
@@ -188,6 +194,7 @@ object RouteCatalog {
                 isSaved = true,
                 startPoint = Pair(userLat, userLng),
                 routesInAreaCount = 1,
+                runnersCount = 380,
                 imageUrl = "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
                 routePoints = listOf(
                     21.0028 to 105.8188,

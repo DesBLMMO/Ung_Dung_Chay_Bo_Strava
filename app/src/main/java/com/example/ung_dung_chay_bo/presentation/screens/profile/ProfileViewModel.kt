@@ -1,10 +1,14 @@
 package com.example.ung_dung_chay_bo.presentation.screens.profile
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.ung_dung_chay_bo.core.health.HealthConnectManager
 import com.example.ung_dung_chay_bo.core.utils.GpsUtils
 import com.example.ung_dung_chay_bo.domain.model.ExperienceLevel
 import com.example.ung_dung_chay_bo.domain.model.Gender
+import com.example.ung_dung_chay_bo.domain.model.HealthConnectStatus
+import com.example.ung_dung_chay_bo.domain.model.HealthSummary
 import com.example.ung_dung_chay_bo.domain.model.RunningGoal
 import com.example.ung_dung_chay_bo.domain.model.SportType
 import com.example.ung_dung_chay_bo.domain.model.UserProfile
@@ -57,6 +61,10 @@ data class ProfileUiState(
     val streakWeeks: Int = 0,
     val weeklyGoalKm: Double = 25.0,
     val recentActivities: List<UserActivityItem> = emptyList(),
+    val healthConnectStatus: HealthConnectStatus = HealthConnectStatus.NOT_SUPPORTED,
+    val isHealthConnectLinked: Boolean = false,
+    val healthSummary: HealthSummary? = null,
+    val connectedDeviceName: String? = null,
     val isLoggedOut: Boolean = false
 )
 
@@ -66,7 +74,8 @@ class ProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val activityRepository: ActivityRepository,
     private val logoutUseCase: LogoutUseCase,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val healthConnectManager: HealthConnectManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -81,6 +90,7 @@ class ProfileViewModel @Inject constructor(
         observeActivityStats()
         observeSocialCounts()
         syncActivitiesFromCloud()
+        checkHealthConnectStatus()
     }
 
     private fun loadUserProfile() {
@@ -193,6 +203,66 @@ class ProfileViewModel @Inject constructor(
 
     fun updateWeeklyGoal(goalKm: Double) {
         _uiState.update { it.copy(weeklyGoalKm = goalKm) }
+    }
+
+    val healthConnectPermissions: Set<String>
+        get() = healthConnectManager.permissions
+
+    fun getHealthConnectInstallIntent(): Intent = healthConnectManager.getInstallIntent()
+
+    fun checkHealthConnectStatus() {
+        viewModelScope.launch {
+            val status = healthConnectManager.getAvailabilityStatus()
+            val hasPermissions = if (status == HealthConnectStatus.AVAILABLE) {
+                healthConnectManager.hasAllPermissions()
+            } else false
+
+            _uiState.update {
+                it.copy(
+                    healthConnectStatus = status,
+                    isHealthConnectLinked = hasPermissions
+                )
+            }
+
+            if (hasPermissions) {
+                syncHealthConnectData()
+            }
+        }
+    }
+
+    fun syncHealthConnectData() {
+        viewModelScope.launch {
+            try {
+                val summary = healthConnectManager.readTodaySummary()
+                _uiState.update { it.copy(healthSummary = summary) }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun onHealthConnectPermissionsResult(granted: Set<String>) {
+        viewModelScope.launch {
+            val isLinked = granted.isNotEmpty()
+            _uiState.update { it.copy(isHealthConnectLinked = isLinked) }
+            if (isLinked) {
+                userRepository.updateChecklistDevice(true, "Google Health Connect")
+                syncHealthConnectData()
+            }
+        }
+    }
+
+    fun onDeviceConnected(deviceName: String) {
+        viewModelScope.launch {
+            userRepository.updateChecklistDevice(true, deviceName)
+            _uiState.update { it.copy(connectedDeviceName = deviceName) }
+        }
+    }
+
+    fun disconnectHealthConnect() {
+        viewModelScope.launch {
+            userRepository.updateChecklistDevice(false, null)
+            _uiState.update { it.copy(isHealthConnectLinked = false, healthSummary = null, connectedDeviceName = null) }
+        }
     }
 
     fun logout() {

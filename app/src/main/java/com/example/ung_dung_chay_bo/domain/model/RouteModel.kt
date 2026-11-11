@@ -30,12 +30,20 @@ data class SuggestedRoute(
     val startPoint: Pair<Double, Double>,
     val routePoints: List<Pair<Double, Double>>,
     val routesInAreaCount: Int = 1,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val runnersCount: Int = 0 // Số lượng người trong cộng đồng đã chạy theo lộ trình này
 ) {
     val durationFormatted: String
         get() {
             val hours = durationMinutes / 60
             val mins = durationMinutes % 60
             return if (hours > 0) "%d giờ %02d phút".format(hours, mins) else "%d phút".format(mins)
+        }
+
+    val runnersCountFormatted: String
+        get() = when {
+            runnersCount >= 1000 -> "%.1fk người chạy".format(runnersCount / 1000.0).replace(".0k", "k")
+            runnersCount > 0 -> "$runnersCount người chạy"
+            else -> ""
         }
 }

@@ -1,5 +1,6 @@
 package com.example.ung_dung_chay_bo.presentation.screens.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,9 +49,11 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -80,10 +83,28 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { grantedPermissions ->
+        viewModel.onHealthConnectPermissionsResult(grantedPermissions)
+    }
 
     if (uiState.isDeviceDialogVisible) {
         DeviceConnectionDialog(
             currentConnectedDeviceName = uiState.checklistState.connectedDeviceName,
+            healthConnectStatus = uiState.healthConnectStatus,
+            isHealthConnectLinked = uiState.isHealthConnectLinked,
+            healthSummary = uiState.healthSummary,
+            onRequestHealthConnect = {
+                permissionLauncher.launch(viewModel.healthConnectPermissions)
+            },
+            onInstallHealthConnect = {
+                context.startActivity(viewModel.getHealthConnectInstallIntent())
+            },
+            onSyncHealthConnect = viewModel::syncHealthConnectData,
+            onDisconnectHealthConnect = viewModel::disconnectHealthConnect,
             onDismiss = viewModel::closeDeviceDialog,
             onDeviceConnected = viewModel::onDeviceConnected,
             onSkipDevice = viewModel::onSkipDevice

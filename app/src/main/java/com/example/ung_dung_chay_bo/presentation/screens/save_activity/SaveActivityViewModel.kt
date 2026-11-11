@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.ung_dung_chay_bo.core.health.HealthConnectManager
 import com.example.ung_dung_chay_bo.core.utils.GpsUtils
 import com.example.ung_dung_chay_bo.core.utils.RoadSnapService
 import com.example.ung_dung_chay_bo.core.utils.RouteCatalog
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -49,7 +51,8 @@ class SaveActivityViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val activityRecordDao: ActivityRecordDao,
     private val activityRepository: ActivityRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val healthConnectManager: HealthConnectManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SaveActivityUiState())
@@ -215,6 +218,22 @@ class SaveActivityViewModel @Inject constructor(
                 )
 
                 userRepository.updateChecklistFirstRun(true)
+
+                // Sync workout session into Health Connect if available
+                try {
+                    val now = Instant.now()
+                    val durationSec = if (state.durationSeconds > 0) state.durationSeconds else 60L
+                    val startTime = now.minusSeconds(durationSec)
+                    healthConnectManager.writeRunningSession(
+                        startTime = startTime,
+                        endTime = now,
+                        title = state.title,
+                        distanceMeters = state.distanceKm * 1000.0,
+                        caloriesBurned = state.calories.toDouble(),
+                        notes = state.description
+                    )
+                } catch (_: Exception) {
+                }
 
                 TrackingService.resetState()
 

@@ -21,6 +21,7 @@ googleMapsCompose = "4.4.1"
 googlePlayServicesLocation = "21.3.0"
 vico = "2.0.0-beta.2"
 material = "1.12.0"
+healthConnect = "1.1.0-alpha10"
 
 [libraries]
 # AndroidX Core
@@ -80,6 +81,9 @@ vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", ve
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+
+# Health Connect
+androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

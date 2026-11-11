@@ -14,12 +14,13 @@ enum class DistanceFilter(val title: String, val minKm: Double, val maxKm: Doubl
 }
 
 data class MapsUiState(
-    val selectedSport: SportType = SportType.TRAIL_RUN,
+    val selectedSport: SportType = SportType.RUN,
     val searchQuery: String = "",
     val activeDistanceFilter: DistanceFilter = DistanceFilter.ALL,
     val activeDifficultyFilter: RouteDifficulty? = null,
     val activeSurfaceFilter: SurfaceType? = null,
     val isSavedOnly: Boolean = false,
+    val isPopularOnly: Boolean = false, // Lọc / Ưu tiên các lộ trình cộng đồng nhiều người chạy
     val routes: List<SuggestedRoute> = emptyList(),
     val selectedRoute: SuggestedRoute? = null,
     val mapType: MapType = MapType.NORMAL,

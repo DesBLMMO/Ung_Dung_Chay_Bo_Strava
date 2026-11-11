@@ -44,14 +44,23 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 matchesSport && matchesSearch && matchesDistance && matchesDifficulty && matchesSurface && matchesSaved
             }
 
-            val nextSelected = if (filtered.any { it.id == current.selectedRoute?.id }) {
+            val sortedList = if (current.isPopularOnly) {
+                filtered.sortedByDescending { it.runnersCount }
+            } else {
+                filtered.sortedWith(
+                    compareByDescending<SuggestedRoute> { it.isPersonalized }
+                        .thenByDescending { it.runnersCount }
+                )
+            }
+
+            val nextSelected = if (sortedList.any { it.id == current.selectedRoute?.id }) {
                 current.selectedRoute
             } else {
-                filtered.firstOrNull()
+                sortedList.firstOrNull()
             }
 
             current.copy(
-                routes = filtered,
+                routes = sortedList,
                 selectedRoute = nextSelected
             )
         }
@@ -133,6 +142,11 @@ class MapsViewModel @Inject constructor() : ViewModel() {
 
     fun toggleSavedOnly() {
         _uiState.update { it.copy(isSavedOnly = !it.isSavedOnly) }
+        updateFilteredRoutes()
+    }
+
+    fun togglePopularOnly() {
+        _uiState.update { it.copy(isPopularOnly = !it.isPopularOnly) }
         updateFilteredRoutes()
     }
 
@@ -230,6 +244,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = true,
                 startPoint = Pair(userLat, userLng),
                 routesInAreaCount = 1,
+                runnersCount = 380,
                 imageUrl = "https://images.unsplash.com/photo-1544717305-2782549b5136?w=400",
                 routePoints = listOf(
                     21.0028 to 105.8188,
@@ -257,6 +272,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.3125, 105.8050),
                 routesInAreaCount = 5,
+                runnersCount = 890,
                 imageUrl = "https://images.unsplash.com/photo-1551632811-561732d1e306?w=400",
                 routePoints = listOf(
                     21.3125 to 105.8050,
@@ -282,6 +298,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0780, 105.3620),
                 routesInAreaCount = 3,
+                runnersCount = 650,
                 imageUrl = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400",
                 routePoints = listOf(
                     21.0780 to 105.3620,
@@ -307,6 +324,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(20.9980, 105.8750),
                 routesInAreaCount = 19,
+                runnersCount = 1420,
                 imageUrl = "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400",
                 routePoints = listOf(
                     20.9980 to 105.8750,
@@ -332,6 +350,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.3200, 105.7950),
                 routesInAreaCount = 4,
+                runnersCount = 980,
                 imageUrl = "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400",
                 routePoints = listOf(
                     21.3200 to 105.7950,
@@ -357,6 +376,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = true,
                 startPoint = Pair(21.0435, 105.8360),
                 routesInAreaCount = 17,
+                runnersCount = 3850,
                 imageUrl = "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=400",
                 routePoints = listOf(
                     21.0435 to 105.8360,
@@ -387,6 +407,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0285, 105.8542),
                 routesInAreaCount = 14,
+                runnersCount = 4720,
                 imageUrl = "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400",
                 routePoints = listOf(
                     21.0285 to 105.8542,
@@ -411,6 +432,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(20.9700, 105.8600),
                 routesInAreaCount = 12,
+                runnersCount = 1260,
                 imageUrl = "https://images.unsplash.com/photo-1486218119243-13883505764c?w=400",
                 routePoints = listOf(
                     20.9700 to 105.8600,
@@ -435,6 +457,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0150, 105.8450),
                 routesInAreaCount = 8,
+                runnersCount = 2190,
                 imageUrl = "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400",
                 routePoints = listOf(
                     21.0150 to 105.8450,
@@ -459,6 +482,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(20.9650, 105.9250),
                 routesInAreaCount = 6,
+                runnersCount = 890,
                 imageUrl = "https://images.unsplash.com/photo-1530549387789-4c1017266635?w=400",
                 routePoints = listOf(
                     20.9650 to 105.9250,
@@ -484,6 +508,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = true,
                 startPoint = Pair(21.0360, 105.8490),
                 routesInAreaCount = 8,
+                runnersCount = 3120,
                 imageUrl = "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?w=400",
                 routePoints = listOf(
                     21.0360 to 105.8490,
@@ -508,6 +533,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(20.9650, 105.8280),
                 routesInAreaCount = 2,
+                runnersCount = 670,
                 imageUrl = "https://images.unsplash.com/photo-1470246973918-29a93221c455?w=400",
                 routePoints = listOf(
                     20.9650 to 105.8280,
@@ -532,6 +558,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0480, 105.8380),
                 routesInAreaCount = 5,
+                runnersCount = 1480,
                 imageUrl = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400",
                 routePoints = listOf(
                     21.0480 to 105.8380,
@@ -556,6 +583,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0410, 105.8290),
                 routesInAreaCount = 3,
+                runnersCount = 820,
                 imageUrl = "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=400",
                 routePoints = listOf(
                     21.0410 to 105.8290,
@@ -581,6 +609,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0750, 105.8150),
                 routesInAreaCount = 9,
+                runnersCount = 2350,
                 imageUrl = "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=400",
                 routePoints = listOf(
                     21.0750 to 105.8150,
@@ -606,6 +635,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0050, 105.7850),
                 routesInAreaCount = 4,
+                runnersCount = 1180,
                 imageUrl = "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=400",
                 routePoints = listOf(
                     21.0050 to 105.7850,
@@ -630,6 +660,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0020, 105.8820),
                 routesInAreaCount = 7,
+                runnersCount = 1620,
                 imageUrl = "https://images.unsplash.com/photo-1511994298241-608e28f14fde?w=400",
                 routePoints = listOf(
                     21.0020 to 105.8820,
@@ -654,6 +685,7 @@ class MapsViewModel @Inject constructor() : ViewModel() {
                 isSaved = false,
                 startPoint = Pair(21.0850, 105.8000),
                 routesInAreaCount = 5,
+                runnersCount = 740,
                 imageUrl = "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=400",
                 routePoints = listOf(
                     21.0850 to 105.8000,

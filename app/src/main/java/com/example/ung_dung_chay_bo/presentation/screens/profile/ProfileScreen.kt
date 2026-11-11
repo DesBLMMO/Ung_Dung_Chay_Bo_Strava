@@ -1,6 +1,7 @@
 package com.example.ung_dung_chay_bo.presentation.screens.profile
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ung_dung_chay_bo.core.theme.ErrorRed
@@ -50,6 +53,7 @@ import com.example.ung_dung_chay_bo.core.theme.SportOrange
 import com.example.ung_dung_chay_bo.domain.model.RunningGoal
 import com.example.ung_dung_chay_bo.domain.model.SportType
 import com.example.ung_dung_chay_bo.domain.model.UserProfile
+import com.example.ung_dung_chay_bo.presentation.screens.device.DeviceConnectionDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,11 +71,38 @@ fun ProfileScreen(
     var showGoalDialog by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showSportSelector by remember { mutableStateOf(false) }
+    var showDeviceDialog by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { grantedPermissions ->
+        viewModel.onHealthConnectPermissionsResult(grantedPermissions)
+    }
 
     LaunchedEffect(uiState.isLoggedOut) {
         if (uiState.isLoggedOut) {
             onLogoutSuccess()
         }
+    }
+
+    if (showDeviceDialog) {
+        DeviceConnectionDialog(
+            currentConnectedDeviceName = uiState.connectedDeviceName ?: uiState.profile?.displayName,
+            healthConnectStatus = uiState.healthConnectStatus,
+            isHealthConnectLinked = uiState.isHealthConnectLinked,
+            healthSummary = uiState.healthSummary,
+            onRequestHealthConnect = {
+                permissionLauncher.launch(viewModel.healthConnectPermissions)
+            },
+            onInstallHealthConnect = {
+                context.startActivity(viewModel.getHealthConnectInstallIntent())
+            },
+            onSyncHealthConnect = viewModel::syncHealthConnectData,
+            onDisconnectHealthConnect = viewModel::disconnectHealthConnect,
+            onDismiss = { showDeviceDialog = false },
+            onDeviceConnected = viewModel::onDeviceConnected,
+            onSkipDevice = { showDeviceDialog = false }
+        )
     }
 
     if (showEditProfileDialog) {
@@ -99,6 +130,10 @@ fun ProfileScreen(
     if (showSettingsMenu) {
         ProfileSettingsSheet(
             onDismiss = { showSettingsMenu = false },
+            onOpenDevices = {
+                showSettingsMenu = false
+                showDeviceDialog = true
+            },
             onLogout = {
                 showSettingsMenu = false
                 viewModel.logout()
@@ -1190,6 +1225,7 @@ private fun EditGoalDialog(
 @Composable
 private fun ProfileSettingsSheet(
     onDismiss: () -> Unit,
+    onOpenDevices: () -> Unit,
     onLogout: () -> Unit
 ) {
     ModalBottomSheet(
@@ -1204,6 +1240,29 @@ private fun ProfileSettingsSheet(
         ) {
             Text("Cài đặt tài khoản", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF111827))
             Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenDevices() },
+                color = Color(0xFFF3F4F6),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.Watch, contentDescription = null, tint = SportOrange)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Thiết bị ngoại vi & Health Connect", color = Color(0xFF111827), fontWeight = FontWeight.Bold, fontSize = 14.5.sp)
+                        Text("Đồng hồ Garmin, Galaxy Watch, Coros, Polar...", color = Color(0xFF6B7280), fontSize = 12.sp)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Surface(
                 modifier = Modifier

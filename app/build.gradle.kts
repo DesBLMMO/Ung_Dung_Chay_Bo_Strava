@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.ung_dung_chay_bo"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.vico.compose.m3)
+    implementation(libs.androidx.health.connect)
 
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)

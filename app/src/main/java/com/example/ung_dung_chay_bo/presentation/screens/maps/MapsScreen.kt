@@ -95,7 +95,8 @@ fun MapsScreen(
                 uiState = uiState,
                 onDistanceSelect = { viewModel.setDistanceFilter(it) },
                 onDifficultySelect = { viewModel.setDifficultyFilter(it) },
-                onSurfaceSelect = { viewModel.setSurfaceFilter(it) }
+                onSurfaceSelect = { viewModel.setSurfaceFilter(it) },
+                onPopularToggle = { viewModel.togglePopularOnly() }
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -334,7 +335,8 @@ private fun FilterChipsRow(
     uiState: MapsUiState,
     onDistanceSelect: (DistanceFilter) -> Unit,
     onDifficultySelect: (RouteDifficulty?) -> Unit,
-    onSurfaceSelect: (SurfaceType?) -> Unit
+    onSurfaceSelect: (SurfaceType?) -> Unit,
+    onPopularToggle: () -> Unit
 ) {
     var isDistanceMenuOpen by remember { mutableStateOf(false) }
     var isDifficultyMenuOpen by remember { mutableStateOf(false) }
@@ -346,6 +348,13 @@ private fun FilterChipsRow(
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Chip lọc Lộ trình phổ biến nhất (nhiều người chạy)
+        FilterChipItem(
+            title = if (uiState.isPopularOnly) "Nhiều người chạy nhất" else "Phổ biến",
+            isSelected = uiState.isPopularOnly,
+            onClick = onPopularToggle
+        )
+
         Surface(
             modifier = Modifier.shadow(2.dp, RoundedCornerShape(20.dp)),
             shape = RoundedCornerShape(20.dp),
@@ -793,7 +802,18 @@ private fun SuggestedRouteBottomCard(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             Text(
-                                text = "%.2f km · %s".format(selectedRoute.distanceKm, selectedRoute.durationFormatted),
+                                text = if (selectedRoute.runnersCount > 0) {
+                                    "%.2f km · %s · %s".format(
+                                        selectedRoute.distanceKm,
+                                        selectedRoute.durationFormatted,
+                                        selectedRoute.runnersCountFormatted
+                                    )
+                                } else {
+                                    "%.2f km · %s".format(
+                                        selectedRoute.distanceKm,
+                                        selectedRoute.durationFormatted
+                                    )
+                                },
                                 fontSize = 12.sp,
                                 color = TextSecondary,
                                 fontWeight = FontWeight.Medium
@@ -982,24 +1002,14 @@ private fun SuggestedRouteBottomCard(
                                             maxLines = 1
                                         )
                                         Text(
-                                            text = "${route.areaName} • ${route.distanceKm} km • ${route.durationFormatted}",
+                                            text = if (route.runnersCount > 0) {
+                                                "${route.areaName} • ${route.distanceKm} km • ${route.runnersCountFormatted}"
+                                            } else {
+                                                "${route.areaName} • ${route.distanceKm} km • ${route.durationFormatted}"
+                                            },
                                             fontSize = 11.sp,
                                             color = TextSecondary
                                         )
-                                    }
-                                    if (route.isPersonalized) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = SportOrange.copy(alpha = 0.15f)
-                                        ) {
-                                            Text(
-                                                text = "Của bạn",
-                                                color = SportOrange,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
                                     }
                                 }
                             }
